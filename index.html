@@ -1,0 +1,642 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AI Code Inspector — Documentation</title>
+  <style>
+    /* -------------------------
+       Reset & base
+    --------------------------*/
+    :root{
+      /* Light/professional document theme (white + blue, dark text) */
+      --bg: #f6f8fb;               /* page background */
+      --panel: #ffffff;            /* sidebar / panels */
+      --muted: #6b7280;            /* subdued copy */
+      --accent: #1e40af;           /* primary blue (links, accents) */
+      --accent-2: #0ea5e9;         /* secondary blue */
+      --card: #ffffff;             /* card background */
+      --glass: rgba(17,24,39,0.03);/* small translucent layer */
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", "Courier New", monospace;
+      --radius:12px;
+      --text: #0b1220;             /* main text color (dark/near-black) */
+      --muted-2: #94a3b8;          /* lighter muted */
+      --border: rgba(16,24,40,0.06);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      /* lock document scroll on wide/desktop layouts; allow only .main to scroll */
+      height:100vh;
+      overflow:hidden;
+      margin:0;
+      font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      background: var(--bg);
+      color:var(--text);
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+      line-height:1.45;
+    }
+
+    /* -------------------------
+       Layout
+    --------------------------*/
+    .wrap{
+      display:grid;
+      grid-template-columns: 320px 1fr;
+      gap:24px;
+      padding:24px;
+      max-width:1200px;
+      margin:24px auto;
+      /* full viewport height and keep inner scrolling to .main */
+      height: calc(100vh - 48px);
+      overflow: hidden;
+    }
+    .sidebar{
+      background:var(--panel);
+      border-radius:var(--radius);
+      padding:16px;
+      min-height:72vh;
+      height:100%;
+      overflow: visible; /* allow footer to stay at bottom, not clip */
+      box-shadow: 0 6px 20px rgba(16,24,40,0.08);
+      position:relative;
+    }
+    .main{
+      padding:20px;
+      border-radius:var(--radius);
+      background: linear-gradient(180deg, rgba(255,255,255,1), rgba(249,250,252,1));
+      /* use full available height inside .wrap and scroll internally */
+      height:100%;
+      box-shadow: 0 6px 16px rgba(16,24,40,0.06);
+      overflow:auto;
+    }
+
+    /* -------------------------
+       Sidebar content
+    --------------------------*/
+    .brand{
+      display:flex;
+      align-items:center;
+      gap:12px;
+      margin-bottom:14px;
+    }
+    .logo{
+      width:48px;
+      height:48px;
+      border-radius:10px;
+      background: linear-gradient(135deg,var(--accent), var(--accent-2));
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-weight:700;
+      color: #ffffff;
+      box-shadow: 0 6px 18px rgba(16,24,40,0.08);
+      font-size:15px;
+    }
+    .brand h3{margin:0;font-size:15px;letter-spacing:0.2px}
+    .brand p{margin:0;font-size:12px;color:var(--muted)}
+
+    .searchBox{
+      margin:12px 0 18px 0;
+      display:flex;
+      gap:8px;
+    }
+    .searchBox input{
+      flex:1;
+      padding:10px 12px;
+      border-radius:10px;
+      background: linear-gradient(180deg,#fff,#fbfdff);
+      border:1px solid var(--border);
+      color:var(--text);
+      outline:none;
+    }
+    .searchBox button{
+      background:transparent;
+      border:1px solid var(--border);
+      padding:8px 10px;
+      border-radius:10px;
+      color:var(--muted);
+      cursor:pointer;
+    }
+
+    .toc{
+      margin-top:6px;
+    }
+    .toc a{
+      display:block;
+      padding:10px 10px;
+      color:var(--text);
+      text-decoration:none;
+      border-radius:8px;
+      font-size:14px;
+    }
+    .toc a:hover{background:rgba(30,64,175,0.06); color:var(--accent)}
+    .toc a.active{background: linear-gradient(90deg, rgba(30,64,175,0.08), rgba(14,165,233,0.03)); color:var(--accent); font-weight:600}
+
+    .sidebar-footer{
+      position:absolute;
+      bottom:16px;
+      left:16px;
+      right:16px;
+      display:flex;
+      justify-content:space-between;
+      gap:8px;
+      align-items:center;
+      color:var(--muted);
+      border-top: 1px solid var(--border);
+      padding-top:10px;
+      font-size:12px;
+    }
+    .btn{
+      padding:8px 12px;
+      border-radius:10px;
+      background:transparent;
+      border:1px solid var(--border);
+      color:var(--text);
+      cursor:pointer;
+    }
+    /* primary button style - small filled variant */
+    .btn.primary{
+      background: linear-gradient(90deg,var(--accent), var(--accent-2));
+      color: #fff;
+      border-color: transparent;
+      box-shadow: 0 6px 18px rgba(14,165,233,0.12);
+    }
+    .btn:hover{ opacity:0.95 }
+
+    /* content links (in-document) */
+    main a{ color:var(--accent); text-decoration:underline; text-decoration-thickness:1px }
+
+    /* copy / small action buttons */
+    .copy-btn{
+      transition: all .14s ease;
+    }
+    .copy-btn:hover{ background: rgba(30,64,175,0.06); color:var(--accent); transform:translateY(-1px) }
+
+    /* -------------------------
+       Main content
+    --------------------------*/
+    .breadcrumb{font-size:13px;color:var(--muted);margin-bottom:10px}
+    .pageHeader{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:16px;
+      margin-bottom:8px;
+    }
+    .pageHeader h1{margin:0;font-size:22px}
+    .pageHeader p{margin:4px 0 0 0;color:var(--muted)}
+
+    .card{
+      background: var(--card);
+      border-radius:12px;
+      padding:16px;
+      margin:18px 0;
+      box-shadow: 0 6px 18px rgba(16,24,40,0.04);
+    }
+
+    h2.section-title{margin:0 0 12px 0; font-size:18px}
+    p.lead{color:var(--muted); margin-top:4px}
+
+    pre{
+      background: #f3f6fb;
+      padding:12px;
+      border-radius:10px;
+      overflow:auto;
+      font-family:var(--mono);
+      font-size:13px;
+      line-height:1.5;
+      position:relative;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .code-row{
+      display:flex;
+      justify-content:flex-end;
+      gap:8px;
+      margin-bottom:8px;
+    }
+    .copy-btn{
+      padding:6px 10px;
+      border-radius:8px;
+      border:none;
+      background:transparent;
+      color:var(--muted);
+      font-size:13px;
+      cursor:pointer;
+    }
+
+    /* -------------------------
+       Responsive
+    --------------------------*/
+    @media (max-width:880px){
+      /* On small screens, allow natural page scrolling and let sidebar overlay */
+      body{overflow:auto;height:auto}
+      .wrap{grid-template-columns: 1fr; padding:12px; height:auto}
+      .sidebar{
+        display:none;
+      }
+      .sidebar.show{
+        display:block;
+        position:fixed;
+        left:12px;
+        top:12px;
+        bottom:12px;
+        width:320px;
+        z-index:60;
+      }
+      .main{min-height:unset;height:auto}
+      .mobile-toggle{
+        display:inline-flex;
+      }
+    }
+
+    /* -------------------------
+       Small helpers
+    --------------------------*/
+    .muted { color:var(--muted) }
+    .pill{display:inline-block;padding:6px 10px;border-radius:999px;background:linear-gradient(90deg, rgba(30,64,175,0.12), rgba(14,165,233,0.04));font-size:12px;color:var(--accent);font-weight:600}
+    .kbd{background:#f0f6ff;padding:6px 8px;border-radius:6px;font-family:var(--mono);font-size:13px;border:1px solid var(--border); color:var(--text)}
+  </style>
+</head>
+<body>
+  <div class="wrap" id="appWrap">
+    <!-- SIDEBAR -->
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <div class="logo">CI</div>
+        <div>
+          <h3>AI Code Inspector</h3>
+          <p>Docs • SaaS</p>
+        </div>
+      </div>
+
+      <div class="searchBox">
+        <input id="docSearch" placeholder="Search docs, e.g. API, SDK, CLI..." />
+        <button id="closeSidebar" class="btn" title="Close sidebar" style="display:none">Close</button>
+      </div>
+
+      <nav class="toc" id="toc">
+        <a href="#overview">Overview</a>
+        <a href="#quickstart">Quick Start</a>
+        <a href="#guides">Guides</a>
+        <a href="#examples">Examples</a>
+        <a href="#api">API Reference</a>
+        <a href="#sdk">SDKs</a>
+        <a href="#integrations">Integrations</a>
+        <a href="#security">Security</a>
+        <a href="#cli">CLI</a>
+        <a href="#faq">FAQ</a>
+        <a href="#changelog">Changelog</a>
+        <a href="#contact">Contact</a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <span class="muted">v1.2.0</span>
+        <div style="display:flex;gap:8px">
+          <button class="btn" onclick="window.location.href='/'">Open App</button>
+          <button class="btn" onclick="window.print()">Print</button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="main">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+        <div>
+          <nav class="breadcrumb">Docs / <span id="crumb">Overview</span></nav>
+          <div class="pageHeader">
+            <div>
+              <h1>AI Code Inspector Documentation</h1>
+              <p class="lead">Quick access to the API, SDKs, CLI and integration examples for your SaaS.</p>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <button class="btn mobile-toggle" onclick="toggleSidebar()" style="display:none">Menu</button>
+              <span class="pill">Stable</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Overview -->
+      <section id="overview" class="card doc-section">
+        <h2 class="section-title">Overview</h2>
+        <p class="muted">AI Code Inspector helps teams find bugs, security issues and code smells automatically — integrate via REST API, SDKs or CLI.</p>
+
+        <div style="margin-top:12px;">
+          <strong>Key features</strong>
+          <ul>
+            <li>Multi-language static analysis</li>
+            <li>Pull request scanning & CI integration</li>
+            <li>Auto-fix suggestions and code explanations</li>
+            <li>Compliance and security rulesets</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- Quick Start -->
+      <section id="quickstart" class="card doc-section">
+        <h2 class="section-title">Quick Start</h2>
+        <p class="muted">Three minutes to scan your first repo.</p>
+
+        <ol>
+          <li>Create an API key in your dashboard → <span class="kbd">Settings → API Keys</span></li>
+          <li>Install CLI or call REST API (examples below)</li>
+          <li>Inspect results in the dashboard or webhook to your CI</li>
+        </ol>
+
+        <div style="margin-top:10px">
+          <div class="code-row">
+            <button class="copy-btn" data-target="#bashInstall">Copy</button>
+          </div>
+          <pre id="bashInstall">
+# install CLI
+npm install -g ai-code-inspector
+# or via curl + installer
+curl -sSL https://install.aicodeinspector.example | sh
+</pre>
+        </div>
+      </section>
+
+      <!-- Guides -->
+      <section id="guides" class="card doc-section">
+        <h2 class="section-title">Guides</h2>
+        <p class="muted">Detailed guides for common workflows — repository setup, CI integration, and advanced scanning.</p>
+
+        <h4 style="margin-top:12px">Repository setup</h4>
+        <p>Use these steps to add AI Code Inspector to existing repositories quickly:</p>
+        <ol>
+          <li>Create or fetch an API key in your dashboard</li>
+          <li>Add a CI step to install the CLI and run a scan on push / pull_request</li>
+          <li>Filter or fail PRs based on severity via exit codes or SARIF integration</li>
+        </ol>
+
+        <h4 style="margin-top:12px">Pull request gating</h4>
+        <p class="muted">Example: fail a PR if any high severity vulnerabilities are found, or only prevent merging for 'critical' issues.</p>
+      </section>
+
+      <!-- Examples -->
+      <section id="examples" class="card doc-section">
+        <h2 class="section-title">Examples</h2>
+        <p class="muted">Copy-paste examples you can try in local projects or CI pipelines.</p>
+
+        <h4 style="margin-top:12px">CI snippet</h4>
+        <div class="code-row"><button class="copy-btn" data-target="#ciExample">Copy</button></div>
+        <pre id="ciExample">
+name: Inspect Code
+on: [pull_request]
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run AI Code Inspector
+        run: ai-inspector scan --path . --api-key ${{ secrets.AI_INSPECTOR_KEY }} --format json
+        </pre>
+      </section>
+
+      <!-- API -->
+      <section id="api" class="card doc-section">
+        <h2 class="section-title">API Reference</h2>
+        <p class="muted">RESTful JSON API for scanning code archives, GitHub repos, or streaming files.</p>
+
+        <h3 style="margin-top:12px">Start a scan</h3>
+        <div class="code-row">
+          <button class="copy-btn" data-target="#apiCurl">Copy</button>
+        </div>
+        <pre id="apiCurl">
+curl -X POST "https://api.aicodeinspector.example/v1/scans" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "source": {
+      "type": "git",
+      "repo": "https://github.com/your/repo",
+      "ref": "main"
+    },
+    "ruleset": "default"
+  }'
+</pre>
+
+        <h3 style="margin-top:12px">Response (201)</h3>
+        <pre>
+{
+  "scan_id": "sc_abc123",
+  "status": "queued",
+  "message": "Scan queued"
+}
+        </pre>
+
+        <h3 style="margin-top:12px">Get results</h3>
+        <pre>
+GET /v1/scans/sc_abc123
+Authorization: Bearer YOUR_API_KEY
+        </pre>
+      </section>
+
+      <!-- SDK -->
+      <section id="sdk" class="card doc-section">
+        <h2 class="section-title">SDKs</h2>
+        <p class="muted">We provide lightweight SDKs for Node, Python and Go.</p>
+
+        <h4>Node.js example</h4>
+        <div class="code-row"><button class="copy-btn" data-target="#nodeExample">Copy</button></div>
+        <pre id="nodeExample">
+// install
+npm i @aicodeinspector/sdk
+
+// usage
+const { Client } = require('@aicodeinspector/sdk');
+const client = new Client({ apiKey: process.env.AI_INSPECTOR_KEY });
+
+(async () => {
+  const scan = await client.scans.create({ repo: 'https://github.com/you/repo' });
+  console.log(scan);
+})();
+        </pre>
+      </section>
+
+      <!-- Integrations -->
+      <section id="integrations" class="card doc-section">
+        <h2 class="section-title">Integrations</h2>
+        <p class="muted">Out-of-the-box integrations for GitHub, GitLab, Bitbucket and popular security platforms.</p>
+
+        <ul>
+          <li>GitHub Actions — Seeding checks and annotations</li>
+          <li>GitLab CI — built-in merge request scanning</li>
+          <li>Jira & ticketing — auto-file security findings</li>
+          <li>Security platforms — SARIF export & SCA linking</li>
+        </ul>
+      </section>
+
+      <!-- Security -->
+      <section id="security" class="card doc-section">
+        <h2 class="section-title">Security</h2>
+        <p class="muted">How scans, storage, and data handling are secured; guidance for private or self-hosted deployments.</p>
+
+        <h4 style="margin-top:12px">Privacy & encryption</h4>
+        <p class="muted">All scan payloads are encrypted in transit. For additional isolation run the self-hosted scanner in your VPC.</p>
+      </section>
+
+      <!-- CLI -->
+      <section id="cli" class="card doc-section">
+        <h2 class="section-title">CLI</h2>
+        <p class="muted">Command line scanner for local projects and CI pipelines.</p>
+
+        <pre>
+# scan current folder
+ai-inspector scan --path . --api-key $AI_KEY
+
+# output as sarif for security platforms
+ai-inspector scan --path . --format sarif > report.sarif
+        </pre>
+
+        <h4>CI Example (GitHub Actions)</h4>
+        <pre>
+name: Inspect Code
+on: [pull_request]
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run AI Code Inspector
+        run: ai-inspector scan --path . --api-key ${{ secrets.AI_INSPECTOR_KEY }} --format json
+        </pre>
+      </section>
+
+      <!-- FAQ -->
+      <section id="faq" class="card doc-section">
+        <h2 class="section-title">FAQ</h2>
+        <details style="margin:8px 0" open>
+          <summary><strong>What languages do you support?</strong></summary>
+          <p class="muted">We support JS/TS, Python, Java, Go, C#, Ruby and more. See supported list in the dashboard.</p>
+        </details>
+        <details style="margin:8px 0">
+          <summary><strong>How is my code kept private?</strong></summary>
+          <p class="muted">All scans are encrypted in transit. You can self-host the scanner or use private-hosting plans for full isolation.</p>
+        </details>
+      </section>
+
+      <!-- Changelog -->
+      <section id="changelog" class="card doc-section">
+        <h2 class="section-title">Changelog</h2>
+        <p class="muted">Recent releases and breaking changes.</p>
+        <ul>
+          <li><strong>v1.2.0</strong> — Add GitHub Actions quick start (2025-11-01)</li>
+          <li><strong>v1.1.0</strong> — Add JS SDK (2025-09-10)</li>
+        </ul>
+      </section>
+
+      <!-- Contact -->
+      <section id="contact" class="card doc-section">
+        <h2 class="section-title">Contact & Support</h2>
+        <p class="muted">Need help? Email <a href="mailto:support@aicodeinspector.example" style="color:var(--accent)">support@aicodeinspector.example</a> or open a ticket in the dashboard.</p>
+      </section>
+
+      <footer style="margin-top:22px;color:var(--muted);font-size:13px;text-align:center">
+        © AI Code Inspector — Documentation
+      </footer>
+    </main>
+  </div>
+
+  <script>
+    // small JS: search, copy, sidebar toggle, active toc highlight
+    (function(){
+      const toc = document.getElementById('toc');
+      const links = Array.from(toc.querySelectorAll('a'));
+      const sections = Array.from(document.querySelectorAll('.doc-section'));
+      const crumb = document.getElementById('crumb');
+      const searchInput = document.getElementById('docSearch');
+
+      // smooth scroll & set active
+      links.forEach(a=>{
+        a.addEventListener('click', e=>{
+          e.preventDefault();
+          const id = a.getAttribute('href').slice(1);
+          const target = document.getElementById(id);
+          if(target){
+            target.scrollIntoView({behavior:'smooth', block:'start'});
+            setActiveLink(a);
+            crumb.textContent = target.querySelector('.section-title')?.textContent || a.textContent;
+            if(window.innerWidth < 880) toggleSidebar(false);
+          }
+        });
+      });
+
+      function setActiveLink(active){
+        links.forEach(l=>l.classList.remove('active'));
+        active.classList.add('active');
+      }
+
+      // copy buttons
+      document.querySelectorAll('.copy-btn').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          const selector = btn.getAttribute('data-target');
+          const el = document.querySelector(selector);
+          if(!el) return;
+          navigator.clipboard.writeText(el.textContent.trim()).then(()=>{
+            btn.textContent = 'Copied';
+            setTimeout(()=> btn.textContent = 'Copy', 1200);
+          }).catch(()=> {
+            btn.textContent = 'Failed';
+            setTimeout(()=> btn.textContent = 'Copy', 1200);
+          });
+        });
+      });
+
+      // search filter - filter toc and show matching sections
+      searchInput.addEventListener('input', ()=>{
+        const q = searchInput.value.trim().toLowerCase();
+        if(!q){
+          links.forEach(l => l.style.display = '');
+          sections.forEach(s => s.style.display = '');
+          return;
+        }
+        links.forEach(l=>{
+          const t = l.textContent.toLowerCase();
+          l.style.display = t.includes(q) ? '' : 'none';
+        });
+        sections.forEach(s=>{
+          const text = s.textContent.toLowerCase();
+          s.style.display = text.includes(q) ? '' : 'none';
+        });
+      });
+
+      // highlight on scroll
+      const rootEl = document.querySelector('.main');
+      const observer = new IntersectionObserver((entries)=>{
+        entries.forEach(entry=>{
+          if(entry.isIntersecting){
+            const id = entry.target.id;
+            const link = toc.querySelector('a[href="#'+id+'"]');
+            if(link) setActiveLink(link);
+            crumb.textContent = entry.target.querySelector('.section-title')?.textContent || entry.target.id;
+          }
+        });
+      }, {root: rootEl || null, rootMargin: '0px 0px -50% 0px', threshold: 0});
+      sections.forEach(s=>observer.observe(s));
+
+      // Sidebar toggle for small screens
+      const sidebar = document.getElementById('sidebar');
+      const closeBtn = document.getElementById('closeSidebar');
+      function toggleSidebar(force){
+        if(window.innerWidth >= 880) return;
+        if(typeof force === 'boolean'){
+          if(force) sidebar.classList.add('show'); else sidebar.classList.remove('show');
+          closeBtn.style.display = sidebar.classList.contains('show') ? 'inline-block' : 'none';
+        } else {
+          sidebar.classList.toggle('show');
+          closeBtn.style.display = sidebar.classList.contains('show') ? 'inline-block' : 'none';
+        }
+      }
+      window.toggleSidebar = toggleSidebar;
+      closeBtn.addEventListener('click', ()=> toggleSidebar(false));
+
+      // initial set
+      if(links.length) setActiveLink(links[0]);
+    })();
+  </script>
+</body>
+</html>
